@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -16,58 +15,7 @@ var transport = &http.Transport{
 	TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 	DisableKeepAlives: true,
 	DialContext: (&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-		DualStack: true,
-	}).DialContext,
-}
-
-var httpClient = &http.Client{
-	Transport: transport,
-}
-
-type request struct {
-	method         string
-	path           string
-	host           string
-	headers        []string
-	body           string
-	followLocation bool
-	timeout        time.Duration
-}
-
-type response struct {
-	request    request
-	status     string
-	statusCode int
-	headers    []string
-	body       []byte
-	err        error
-}
-
-func (r request) Hostname() string {
-	u, err := url.Parse(r.host)
-	if err != nil {
-		return "unknown"
-	}
-	return u.Hostname()
-}
-
-func (r request) URL() string {
-	return r.host + r.path
-}
-
-func (r request) HasHeader(h string) bool {
-	norm := func(s string) string {
-		return strings.ToLower(strings.TrimSpace(s))
-	}
-	for _, candidate := range r.headers {
-		p := strings.SplitN(candidate, ":", 2)
-		if norm(p[0]) == norm(h) {
-			return true
-		}
-	}
-	return false
+		Timeout:    error
 }
 
 func goRequest(r request) response {
@@ -76,7 +24,10 @@ func goRequest(r request) response {
 	if !r.followLocation {
 		httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
-	http.Request
+		}
+	}
+
+	var req *http.Request
 	var err error
 	if r.body != "" {
 		req, err = http.NewRequest(r.method, r.URL(), bytes.NewBuffer([]byte(r.body)))
@@ -98,14 +49,7 @@ func goRequest(r request) response {
 	}
 
 	for _, h := range r.headers {
-		parts := strings.SplitN(h, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		req.Header.Set(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
-	}
-
-	resp, err := httpClient.Do(req)
+		parts := strings(req)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
@@ -123,15 +67,7 @@ func goRequest(r request) response {
 
 	return response{
 		request:    r,
-		status:     resp.Status,
-		statusCode: resp.StatusCode,
-		headers:    hs,
-		body:       body,
-	}
-}
-
-func main() {
-	// Example usage
+		status:     resp.Status// Example usage
 	req := request{
 		method:         "GET",
 		host:           "https://example.com",
@@ -141,7 +77,8 @@ func main() {
 		timeout:        10 * time.Second,
 	}
 	resp := goRequest(req)
-	if.err)
+	if resp.err != nil {
+		fmt.Println("Request failed:", resp.err)
 	} else {
 		fmt.Println("Response status:", resp.status)
 		fmt.Println("Response headers:", resp.headers)
